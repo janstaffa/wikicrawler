@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
-import { ClipLoader } from 'react-spinners';
-import { urlList } from '../urlList';
-import { DoubleLinkedList } from '../utils/doubleLinkedList';
-import { getPageTitle } from '../utils/getPageTitle';
-import { randomInt } from '../utils/randomInt';
+import { useEffect, useRef, useState } from "react";
+import { ClipLoader } from "react-spinners";
+import { urlList } from "../urlList";
+import { DoubleLinkedList } from "../utils/doubleLinkedList";
+import { getPageTitle } from "../utils/getPageTitle";
+import { randomInt } from "../utils/randomInt";
 
 interface Page {
   title: string;
@@ -20,27 +20,28 @@ const Game: React.FC = () => {
   const [clickedLinks, setClickedLinks] = useState<number>(0);
   const clickedLinksRef = useRef<number>(clickedLinks);
   clickedLinksRef.current = clickedLinks;
-  const incrementClickedLinks = () => {
-    setClickedLinks(clickedLinks + 1);
-  };
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [startPage, setStartPage] = useState<Page>();
   const [targetPage, setTargetPage] = useState<Page>();
+  const targetPageRef = useRef<Page>();
+  targetPageRef.current = targetPage;
   const [currentPage, setCurrentPage] = useState<CurrentPage>({
-    url: '',
+    url: "",
     previousPage: null,
     nextPage: null,
   });
 
   const newGame = () => {
+    if (isLoading) return;
     const startURL = urlList[randomInt(0, urlList.length - 1)];
     getPageTitle(startURL).then((title) => {
       if (title) {
         setStartPage({ url: startURL, title });
+        setClickedLinks(0);
       }
     });
 
-    let targetURL = '';
+    let targetURL = "";
     do {
       targetURL = urlList[randomInt(0, urlList.length - 1)];
     } while (targetURL === startURL);
@@ -49,7 +50,6 @@ const Game: React.FC = () => {
         setTargetPage({ url: targetURL, title });
       }
     });
-
     setCurrentPage({
       url: startURL,
       nextPage: null,
@@ -59,38 +59,68 @@ const Game: React.FC = () => {
   useEffect(() => {
     newGame();
   }, []);
-  const [currentPageName, setCurrentPageName] = useState<string>('');
+
+  const [currentPageName, setCurrentPageName] = useState<string>("");
 
   const iframe = useRef<HTMLIFrameElement>(null);
 
   const pageHistory = useRef<DoubleLinkedList>();
   pageHistory.current = new DoubleLinkedList();
   useEffect(() => {
-    if (currentPage.url === targetPage?.url) {
-      alert('You win!');
+    if (currentPage.url === targetPageRef.current?.url) {
+      alert("You win!");
     }
     setIsLoading(true);
     const currentIframe = iframe.current;
 
+    const iframeDocument = currentIframe?.contentWindow?.document;
+    if (!iframeDocument) return;
+    const onClick = (e: Event) => {
+      const clickedElement = e.target as Element;
+      const closestLink = clickedElement.closest("a");
+      if (!clickedElement && !closestLink) return;
+      let finalElement = clickedElement;
+      if (!(clickedElement.tagName === "A")) {
+        if (!closestLink) return;
+        finalElement = closestLink;
+      }
+      const dataHref = finalElement.getAttribute("data-href");
+      if (!dataHref || dataHref === "/") return;
+      if (dataHref[0] === "#") {
+        const anchorTo = iframeDocument.querySelector(dataHref);
+        if (anchorTo) {
+          anchorTo.scrollIntoView();
+        }
+        return;
+      }
+
+      setClickedLinks(clickedLinksRef.current + 1);
+      setCurrentPage({
+        url: origin + dataHref,
+        previousPage: currentPage,
+        nextPage: null,
+      });
+      currentIframe?.contentWindow?.scrollTo({ top: 0 });
+    };
     fetch(currentPage.url)
       .then((data) => data.text())
       .then((data) => {
-        const _document = document.createElement('html');
+        const _document = document.createElement("html");
         _document.innerHTML = data;
 
-        const newPage = document.createElement('html');
-        const newHead = document.createElement('head');
-        const newBody = document.createElement('body');
-        const head = _document.querySelector('head');
+        const newPage = document.createElement("html");
+        const newHead = document.createElement("head");
+        const newBody = document.createElement("body");
+        const head = _document.querySelector("head");
         const title = _document.querySelector(
-          '#firstHeading'
+          "#firstHeading"
         ) as HTMLHeadingElement;
-        const body = _document.querySelector('#bodyContent');
+        const body = _document.querySelector("#bodyContent");
 
         if (!head || !body) return;
 
         if (title) {
-          title.style.marginTop = '0';
+          title.style.marginTop = "0";
           newBody.prepend(title);
           setCurrentPageName(title.innerText);
         }
@@ -108,11 +138,11 @@ const Game: React.FC = () => {
         newHead.appendChild(head);
 
         const toRemove: Element[] = [];
-        const removeSections = body.querySelectorAll('.mw-editsection');
+        const removeSections = body.querySelectorAll(".mw-editsection");
         toRemove.push(...Array.from(removeSections));
-        const navBoxes = body.querySelectorAll('.navbox, .navbox2');
+        const navBoxes = body.querySelectorAll(".navbox, .navbox2");
         toRemove.push(...Array.from(navBoxes));
-        const categories = body.querySelector('#catlinks');
+        const categories = body.querySelector("#catlinks");
         if (categories) {
           toRemove.push(categories);
         }
@@ -120,51 +150,40 @@ const Game: React.FC = () => {
           toRemove.forEach((el) => el.remove());
         }
 
-        const newLinks = body.querySelectorAll('a.new');
+        const newLinks = body.querySelectorAll("a.new");
         Array.from(newLinks).forEach((el) => {
-          el.classList.remove('new');
-          el.outerHTML = '<span>' + el.innerHTML + '</span>';
+          el.classList.remove("new");
+          el.outerHTML = "<span>" + el.innerHTML + "</span>";
         });
-        const links = body.getElementsByTagName('a');
+        const links = body.getElementsByTagName("a");
         if (links) {
           const origin = new URL(currentPage.url).origin;
           Array.from(links).forEach((link) => {
-            if (!link.href) return;
+            const rawHref = link.getAttribute("href");
+            if (!link.href || !rawHref) return;
             const parsed = new URL(link.href);
 
+            let finalHref = parsed.pathname + parsed.search;
+            if (parsed.hash && rawHref[0] === "#") {
+              finalHref = parsed.hash;
+            }
             if (parsed.origin !== window.origin) {
-              link.outerHTML = '<span>' + link.innerHTML + '</span>';
+              link.outerHTML = "<span>" + link.innerHTML + "</span>";
               return;
             }
-            link.setAttribute('data-href', parsed.pathname + parsed.search);
-            link.removeAttribute('href');
-            currentIframe?.contentWindow?.document.addEventListener(
-              'click',
-              (e) => {
-                if (
-                  e.target &&
-                  (e.target as Element).outerHTML === link.outerHTML
-                ) {
-                  incrementClickedLinks();
-                  setCurrentPage({
-                    url: origin + link.getAttribute('data-href'),
-                    previousPage: currentPage,
-                    nextPage: null,
-                  });
-                  currentIframe?.contentWindow?.scrollTo({ top: 0 });
-                }
-              }
-            );
+            link.setAttribute("data-href", finalHref);
+            link.removeAttribute("href");
           });
+          iframeDocument.addEventListener("click", onClick);
         }
 
         newBody.appendChild(body);
-        newBody.style.padding = '10px';
+        newBody.style.padding = "10px";
         newPage.append(newHead, newBody);
 
         if (!newPage) return;
         const iframeHTML =
-          currentIframe?.contentWindow?.document.querySelector('html');
+          currentIframe?.contentWindow?.document.querySelector("html");
         if (!iframeHTML) return;
         iframeHTML.innerHTML = newPage.outerHTML;
         setIsLoading(false);
@@ -173,10 +192,11 @@ const Game: React.FC = () => {
     return () => {
       const doc = currentIframe?.contentWindow?.document.documentElement;
       if (doc) {
-        doc.innerHTML = '';
+        doc.innerHTML = "";
       }
+      currentIframe?.removeEventListener("click", onClick);
     };
-  }, [currentPage, targetPage]);
+  }, [currentPage]);
 
   return (
     <main>
@@ -235,7 +255,7 @@ const Game: React.FC = () => {
         </div>
         <div className="game-wrap">
           <iframe
-            className={'game-window' + (isLoading ? ' hidden' : '')}
+            className={"game-window" + (isLoading ? " hidden" : "")}
             ref={iframe}
             title="game window"
           />
