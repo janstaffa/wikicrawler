@@ -63,12 +63,12 @@ const Game: React.FC = () => {
       getPageTitle(targetURL!).then((title) => {
         if (title) {
           setTargetPage({ url: targetURL!, title });
+          setCurrentPage({
+            url: startURL,
+            nextPage: null,
+            previousPage: null,
+          });
         }
-      });
-      setCurrentPage({
-        url: startURL,
-        nextPage: null,
-        previousPage: null,
       });
     });
   };
@@ -296,7 +296,7 @@ const Game: React.FC = () => {
           <div>
             <button
               onClick={() => {
-                if (isLoading) return;
+                if (isLoading || gameEnded) return;
                 currentPage.previousPage &&
                   setCurrentPage({
                     ...currentPage.previousPage,
@@ -309,7 +309,7 @@ const Game: React.FC = () => {
             </button>
             <button
               onClick={() => {
-                if (isLoading) return;
+                if (isLoading || gameEnded) return;
                 currentPage.nextPage && setCurrentPage(currentPage.nextPage);
               }}
               title="Go forward in history"
@@ -317,9 +317,7 @@ const Game: React.FC = () => {
               &gt;
             </button>
           </div>
-          <div>
-            <b>{currentPageName}</b>
-          </div>
+          <div>{!gameEnded && <b>{currentPageName}</b>}</div>
         </div>
         <div className="game-wrap">
           <iframe
