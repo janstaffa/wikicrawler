@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ClipLoader } from 'react-spinners';
 import { Popup } from 'react-tiny-modals';
+import { proxyServerURL } from '../constants';
 import { urlList } from '../urlList';
 import { DoubleLinkedList } from '../utils/doubleLinkedList';
 import { getPageTitle } from '../utils/getPageTitle';
@@ -47,7 +48,7 @@ const Game: React.FC = () => {
       if (pages?.[0] && !easyModeRef.current) {
         startURL = pages[0];
       }
-      getPageTitle(startURL).then((title) => {
+      getPageTitle(startURL!).then((title) => {
         if (title) {
           setStartPage({ url: startURL, title });
           setClickedLinks(0);
@@ -122,7 +123,7 @@ const Game: React.FC = () => {
       });
       currentIframe?.contentWindow?.scrollTo({ top: 0 });
     };
-    fetch(currentPage.url)
+    fetch(proxyServerURL + currentPage.url)
       .then((data) => data.text())
       .then((data) => {
         const _document = document.createElement('html');

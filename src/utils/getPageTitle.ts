@@ -1,5 +1,7 @@
+import { proxyServerURL } from '../constants';
+
 export const getPageTitle = (url: string) => {
-  return fetch(url)
+  return fetch(proxyServerURL + url)
     .then((data) => data.text())
     .then((data) => {
       if (!data) throw new Error("URL can't be reached.");
